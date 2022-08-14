@@ -1,0 +1,1 @@
+./mvnw -U --batch-mode --update-snapshots verify -Dquarkus.profile=test

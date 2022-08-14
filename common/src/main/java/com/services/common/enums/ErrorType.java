@@ -1,0 +1,74 @@
+package com.services.common.enums;
+
+import lombok.Getter;
+
+import java.util.Collections;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+public enum ErrorType {
+
+    BAD_REQUEST("BAD_REQUEST", 400),
+    UNAUTHORIZED("UNAUTHORIZED", 401),
+    PAYMENT_REQUIRED("PAYMENT_REQUIRED", 402),
+    FORBIDDEN("FORBIDDEN", 403),
+    NOT_FOUND("NOT_FOUND", 404),
+    METHOD_NOT_ALLOWED("METHOD_NOT_ALLOWED", 405),
+    NOT_ACCEPTABLE("NOT_ACCEPTABLE", 406),
+    PROXY_AUTHENTICATION_REQUIRED("PROXY_AUTHENTICATION_REQUIRED", 407),
+    REQUEST_TIMEOUT("REQUEST_TIMEOUT", 408),
+    CONFLICT("CONFLICT", 409),
+    GONE("GONE", 410),
+    LENGTH_REQUIRED("LENGTH_REQUIRED", 411),
+    PRECONDITION_FAILED("PRECONDITION_FAILED", 412),
+    PAYLOAD_TOO_LARGE("PAYLOAD_TOO_LARGE", 413),
+    URI_TOO_LONG("URI_TOO_LONG", 414),
+    UNSUPPORTED_MEDIA_TYPE("UNSUPPORTED_MEDIA_TYPE", 415),
+    REQUESTED_RANGE_NOT_SATISFIABLE("REQUESTED_RANGE_NOT_SATISFIABLE", 416),
+    EXPECTATION_FAILED("EXPECTATION_FAILED", 417),
+    UNPROCESSABLE_ENTITY("UNPROCESSABLE_ENTITY", 422),
+    LOCKED("LOCKED", 423),
+    FAILED_DEPENDENCY("FAILED_DEPENDENCY", 424),
+    UPGRADE_REQUIRED("UPGRADE_REQUIRED", 426),
+    PRECONDITION_REQUIRED("PRECONDITION_REQUIRED", 428),
+    TOO_MANY_REQUESTS("TOO_MANY_REQUESTS", 429),
+    REQUEST_HEADER_FIELDS_TOO_LARGE("REQUEST_HEADER_FIELDS_TOO_LARGE", 431),
+    UNAVAILABLE_FOR_LEGAL_REASONS("UNAVAILABLE_FOR_LEGAL_REASONS", 451),
+    INTERNAL_SERVER_ERROR("INTERNAL_SERVER_ERROR", 500),
+    NOT_IMPLEMENTED("NOT_IMPLEMENTED", 501),
+    BAD_GATEWAY("BAD_GATEWAY", 502),
+    SERVICE_UNAVAILABLE("SERVICE_UNAVAILABLE", 503),
+    GATEWAY_TIMEOUT("GATEWAY_TIMEOUT", 504),
+    HTTP_VERSION_NOT_SUPPORTED("HTTP_VERSION_NOT_SUPPORTED", 505),
+    VARIANT_ALSO_NEGOTIATES("VARIANT_ALSO_NEGOTIATES", 506),
+    INSUFFICIENT_STORAGE("INSUFFICIENT_STORAGE", 507),
+    LOOP_DETECTED("LOOP_DETECTED", 508),
+    BANDWIDTH_LIMIT_EXCEEDED("BANDWIDTH_LIMIT_EXCEEDED", 509),
+    NOT_EXTENDED("NOT_EXTENDED", 510),
+    NETWORK_AUTHENTICATION_REQUIRED("NETWORK_AUTHENTICATION_REQUIRED", 511);
+
+    private static final Map<Integer, ErrorType> ERROR_MAP;
+
+    static {
+        Map<Integer, ErrorType> map = new ConcurrentHashMap<>();
+        for (ErrorType instance : ErrorType.values()) {
+            map.put(instance.getStatusCode(), instance);
+        }
+        ERROR_MAP = Collections.unmodifiableMap(map);
+    }
+
+    @Getter
+    private final String value;
+
+    @Getter
+    private final Integer statusCode;
+
+    ErrorType(String value, Integer statusCode) {
+        this.value = value;
+        this.statusCode = statusCode;
+    }
+
+    public static ErrorType get(Integer code) {
+        return ERROR_MAP.get(code) != null ? ERROR_MAP.get(code) : ErrorType.BAD_REQUEST;
+    }
+}

@@ -1,0 +1,93 @@
+quarkus:
+
+  profile: ${ENVIRONMENT:dev}
+
+  vertx:
+    event-loops-pool-size: ${QUARKUS_EVENT_LOOPS_POOL_SIZE:4}
+    worker-pool-size: ${QUARKUS_WORKER_POOL_SIZE:200}
+
+  container-image:
+    push: true
+    build: true
+    image: ${IMAGE_URL:default}:${IMAGE_TAG:default}
+
+  log:
+    sentry:
+      ~: ${SENTRY_ENABLED:true}
+      dsn: ${SENTRY_DSN:false}
+      minimum-event-level: ${SENTRY_MINIMUM_EVENT_LEVEL:ERROR}
+      environment: ${K8S_APP_ENV:dev}
+      release: ${K8S_APP_VERSION:dev}
+      server-name: ${QUARKUS_APPLICATION_NAME:default}
+      traces-sample-rate: 0.01
+      in-app-packages: com.services
+    level: INFO
+    console:
+      format: "%d{yyyy-MM-dd HH:mm:ss,SSS} |- %-5p traceId=%X{traceId}, parentId=%X{parentId}, spanId=%X{spanId}, sampled=%X{sampled} in %c:%L{3.} [%t] - %s%e%n"
+
+  micrometer:
+    binder:
+      vertx:
+        enabled: true
+      system: true
+      jvm: true
+      mp-metrics:
+        enabled: true
+      http-server:
+        enabled: true
+
+  mongodb:
+    database: ${MONGO_DEFAULT_DB:defaultDB}
+    application-name: ${QUARKUS_APPLICATION_NAME:default}
+    connection-string: mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOST_1},${MONGO_HOST_2},${MONGO_HOST_3}
+    tls: ${MONGO_TLS_ENABLED:true}
+    tls-insecure: ${MONGO_TLS_INSECURE:true}
+    metrics:
+      enabled: true
+    tracing:
+      enabled: true
+
+  hibernate-orm:
+    database:
+      globally-quoted-identifiers: true
+  redis:
+    hosts: ${REDIS_HOSTS:redis://localhost:6379}
+    client-type: ${REDIS_CLIENT_TYPE:standalone}
+    health:
+      enabled: ${REDIS_HEALTH_ENABLED:false}
+
+  opentelemetry:
+    enabled: ${OTEL_ENABLED:true}
+    tracer:
+      enabled: true
+      sampler:
+        ratio: ${OTEL_SAMPLER_RATIO:0.3}
+      exporter:
+        otlp:
+          endpoint: ${OTEL_ENDPOINT:https://otlp.nr-data.net}
+          compression: ${OTEL_COMPRESSION:gzip}
+          headers: ${OTEL_HEADERS:api-key=qwerty}
+      resource-attributes: ${OTEL_RESOURCE_ATTRIBUTES:service.name=dev}
+
+  ssl:
+    native: true
+
+  devservices:
+    enabled: false
+
+framework:
+
+  redis:
+    enabled: ${FRAMEWORK_REDIS_ENABLED:true}
+    defaultExpiryInMilli: ${FRAMEWORK_REDIS_DEFAULTEXPIRYINMILLI:3600000}
+
+  mongodb:
+    enabled: ${FRAMEWORK_MONGODB_ENABLED:true}
+
+  sql:
+    enabled: ${FRAMEWORK_SQL_ENABLED:true}
+
+  rollbar:
+    enabled: ${FRAMEWORK_ROLLBAR_ENABLED:true}
+
+

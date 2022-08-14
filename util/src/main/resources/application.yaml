@@ -1,0 +1,12 @@
+framework:
+  aws:
+    s3:
+      enabled: ${FRAMEWORK_AWS_S3_ENABLED:false}
+    sns:
+      enabled: ${FRAMEWORK_AWS_SNS_ENABLED:false}
+    sqs:
+      enabled: ${FRAMEWORK_AWS_SQS_ENABLED:false}
+      workers:
+        enabled: ${FRAMEWORK_AWS_SQS_WORKERS_ENABLED:false}
+    ses:
+      enabled: ${FRAMEWORK_AWS_SES_ENABLED:false}

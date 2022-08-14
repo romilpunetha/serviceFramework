@@ -1,0 +1,1 @@
+./mvnw clean install -Pnative -Dquarkus.native.container-build=true -Dquarkus.profile=dev
