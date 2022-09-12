@@ -60,12 +60,6 @@ framework:
     enabled: ${FRAMEWORK_REDIS_ENABLED:true}
     defaultExpiryInMilli: ${FRAMEWORK_REDIS_DEFAULTEXPIRYINMILLI:10000}
 
-  mongodb:
-    enabled: true
-    connection-string: mongodb://localhost:27017,localhost:27018
-    tls: false
-    tls-insecure: false
-
   sql:
     enabled: ${FRAMEWORK_SQL_ENABLED:true}
   rollbar:
@@ -85,8 +79,3 @@ framework:
       enabled: false
       workers:
         enabled: false
-
-outbox:
-  auto:
-    register:
-      schemas: true

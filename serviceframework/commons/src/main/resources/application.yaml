@@ -1,0 +1,24 @@
+framework:
+  outbox:
+    serializer: ${FRAMEWORK_OUTBOX_SERIALIZER:confluentAvroSerializer}
+    auto:
+      register:
+        schemas: ${FRAMEWORK_OUTBOX_AUTO_REGISTER_SCHEMAS:true}
+
+mp:
+  messaging:
+    connector:
+      smallrye-kafka:
+        schema:
+          registry:
+            url: ${SCHEMA_REGISTRY_URL:http://localhost:29080}
+        avro:
+          remove:
+            java:
+              properties: ${FRAMEWORK_OUTBOX_AVRO_REMOVE_JAVA_PROPERTIES:true}
+          use:
+            logical:
+              type:
+                converters: ${FRAMEWORK_OUTBOX_AVRO_USE_LOGICAL_TYPE_CONVERTERS:true}
+        normalize:
+          schemas: ${FRAMEWORK_OUTBOX_NORMALIZE_SCHEMAS:true}

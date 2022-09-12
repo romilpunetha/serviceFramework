@@ -1,0 +1,6 @@
+framework:
+  outbox:
+    serializer: ${FRAMEWORK_OUTBOX_SERIALIZER:defaultSerializer}
+    auto:
+      register:
+        schemas: ${FRAMEWORK_OUTBOX_AUTO_REGISTER_SCHEMAS:true}

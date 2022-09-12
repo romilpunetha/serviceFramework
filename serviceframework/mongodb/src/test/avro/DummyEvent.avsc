@@ -1,7 +1,7 @@
 {
   "type": "record",
   "name": "DummyEvent",
-  "namespace": "com.services.serviceFramework.mongodb.avro",
+  "namespace": "com.services.sf.mongo.test.avro",
   "doc": "Schema for a Dummy Event.",
   "fields": [
     {
