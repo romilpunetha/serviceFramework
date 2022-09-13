@@ -5,6 +5,7 @@ import com.services.common.domain.basesql.BaseSqlDomain;
 import com.services.common.domain.basesql.Outbox;
 import com.services.common.enums.OutboxEvent;
 import com.services.sf.sql.outbox.OutboxService;
+import io.quarkus.arc.properties.IfBuildProperty;
 import io.quarkus.hibernate.reactive.panache.common.runtime.ReactiveTransactional;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.unchecked.Unchecked;
@@ -22,6 +23,8 @@ import java.util.stream.Collectors;
 @NoArgsConstructor
 @ApplicationScoped
 @FieldDefaults(level = AccessLevel.PRIVATE)
+@IfBuildProperty(name = "framework.outbox.enabled", stringValue = "true")
+@IfBuildProperty(name = "framework.sql.enabled", stringValue = "true")
 public abstract class BaseOutboxSqlServiceImpl<T extends BaseSqlEntity, E extends BaseSqlDomain, C extends AbstractDomain>
         extends BaseSqlServiceImpl<T, E, C>
         implements BaseOutboxSqlService<T, E, C> {

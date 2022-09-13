@@ -4,6 +4,7 @@ import com.services.common.domain.base.AvroData;
 import com.services.common.domain.basesql.Outbox;
 import com.services.common.domain.util.LocalContext;
 import com.services.sf.commons.base.outbox.OutboxSerializer;
+import io.quarkus.arc.properties.IfBuildProperty;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import lombok.AccessLevel;
@@ -20,6 +21,7 @@ import java.util.Map;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @ApplicationScoped
+@IfBuildProperty(name = "framework.outbox.enabled", stringValue = "true")
 public class OutboxServiceImpl
         implements OutboxService {
 
@@ -39,7 +41,7 @@ public class OutboxServiceImpl
 
         this.repository = repository;
     }
- 
+
     public Uni<Outbox> create(Outbox e) {
         return repository.create(e);
     }

@@ -17,6 +17,7 @@ import java.util.Map;
 
 @ApplicationScoped
 @FieldDefaults(level = AccessLevel.PRIVATE)
+@IfBuildProperty(name = "framework.outbox.enabled", stringValue = "true")
 @IfBuildProperty(name = "framework.outbox.serializer", stringValue = "confluentAvroSerializer")
 public class ConfluentAvroSerializer implements OutboxSerializer {
 
@@ -24,7 +25,7 @@ public class ConfluentAvroSerializer implements OutboxSerializer {
     final KafkaAvroSerializer serializer;
 
 
-    public ConfluentAvroSerializer(@ConfigProperty(name = "framework.outbox." + KafkaAvroSerializerConfig.SCHEMA_REGISTRY_URL_CONFIG, defaultValue = "http://localhost:8085") List<String> SCHEMA_REGISTRY_URL_CONFIG,
+    public ConfluentAvroSerializer(@ConfigProperty(name = "framework.outbox." + KafkaAvroSerializerConfig.SCHEMA_REGISTRY_URL_CONFIG) List<String> SCHEMA_REGISTRY_URL_CONFIG,
                                    @ConfigProperty(name = "framework.outbox." + KafkaAvroSerializerConfig.MAX_SCHEMAS_PER_SUBJECT_CONFIG, defaultValue = "1000") Integer MAX_SCHEMAS_PER_SUBJECT_CONFIG,
                                    @ConfigProperty(name = "framework.outbox." + KafkaAvroSerializerConfig.AVRO_REFLECTION_ALLOW_NULL_CONFIG, defaultValue = "true") boolean AVRO_REFLECTION_ALLOW_NULL_CONFIG,
                                    @ConfigProperty(name = "framework.outbox." + KafkaAvroSerializerConfig.AVRO_USE_LOGICAL_TYPE_CONVERTERS_CONFIG, defaultValue = "true") boolean AVRO_USE_LOGICAL_TYPE_CONVERTERS_CONFIG,

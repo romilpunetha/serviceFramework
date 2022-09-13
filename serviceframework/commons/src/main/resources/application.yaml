@@ -1,5 +1,6 @@
 framework:
   outbox:
+    enabled: ${FRAMEWORK_OUTBOX_ENABLED}
     serializer: ${FRAMEWORK_OUTBOX_SERIALIZER:confluentAvroSerializer}
     auto:
       register:
@@ -9,9 +10,6 @@ mp:
   messaging:
     connector:
       smallrye-kafka:
-        schema:
-          registry:
-            url: ${SCHEMA_REGISTRY_URL:http://localhost:29080}
         avro:
           remove:
             java:

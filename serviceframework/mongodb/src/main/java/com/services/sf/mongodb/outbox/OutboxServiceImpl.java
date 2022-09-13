@@ -4,6 +4,7 @@ import com.mongodb.reactivestreams.client.ClientSession;
 import com.services.common.domain.base.AvroData;
 import com.services.common.domain.basemongo.Outbox;
 import com.services.sf.commons.base.outbox.OutboxSerializer;
+import io.quarkus.arc.properties.IfBuildProperty;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import lombok.AccessLevel;
@@ -21,6 +22,7 @@ import java.util.Map;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @ApplicationScoped
+@IfBuildProperty(name = "framework.outbox.enabled", stringValue = "true")
 public class OutboxServiceImpl
         implements OutboxService {
 

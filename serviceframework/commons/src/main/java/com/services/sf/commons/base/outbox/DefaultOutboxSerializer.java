@@ -9,7 +9,8 @@ import javax.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@IfBuildProperty(name = "framework.outbox.serializer", stringValue = "defaultSerializer")
+@IfBuildProperty(name = "framework.outbox.enabled", stringValue = "true")
+@IfBuildProperty(name = "framework.outbox.serializer", stringValue = "defaultAvroSerializer")
 public class DefaultOutboxSerializer implements OutboxSerializer {
 
     public DefaultOutboxSerializer() {

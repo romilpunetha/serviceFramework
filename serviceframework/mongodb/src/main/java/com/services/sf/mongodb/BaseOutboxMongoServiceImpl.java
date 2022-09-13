@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 @ApplicationScoped
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @IfBuildProperty(name = "framework.mongodb.enabled", stringValue = "true")
+@IfBuildProperty(name = "framework.outbox.enabled", stringValue = "true")
 public abstract class BaseOutboxMongoServiceImpl<T extends BaseMongoEntity, E extends BaseMongoDomain, C extends AbstractDomain>
         extends BaseMongoServiceImpl<T, E, C>
         implements BaseOutboxMongoService<T, E, C> {

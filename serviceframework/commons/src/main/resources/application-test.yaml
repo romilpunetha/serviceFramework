@@ -1,5 +1,6 @@
 framework:
   outbox:
+    enabled: ${FRAMEWORK_OUTBOX_ENABLED:true}
     serializer: ${FRAMEWORK_OUTBOX_SERIALIZER:defaultSerializer}
     auto:
       register:
