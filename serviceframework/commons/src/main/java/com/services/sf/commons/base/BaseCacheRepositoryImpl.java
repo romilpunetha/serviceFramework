@@ -42,12 +42,12 @@ import java.util.stream.IntStream;
 public class BaseCacheRepositoryImpl<C>
         implements BaseCacheRepository<C> {
 
-    final ObjectMapper objectMapper;
+   final ObjectMapper objectMapper;
     @Inject
     protected LocalContext localContext;
 
     @Inject
-    protected ReactiveRedisClient asyncRedisClient;
+    protected ReactiveRedisDataSource reactiveRedisDataSource;
 
     @Setter
     Boolean hasTenant;
@@ -95,93 +95,78 @@ public class BaseCacheRepositoryImpl<C>
                 id;
     }
 
+    private Response okResponse() {
+        return Response.newInstance(SimpleStringType.OK);
+    }
+
     @WithSpan(kind = SpanKind.CLIENT)
     public Uni<Boolean> exists(@SpanAttribute("query.id") final String id) {
-
-        return asyncRedisClient.exists(List.of(getBucket(id)))
-                .map(response -> Integer.parseInt(response.getDelegate().toString()) > 0);
+        return reactiveRedisDataSource.key(String.class).exists(getBucket(id));
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Uni<C> get(@SpanAttribute("query.id") final String id) {
-        return asyncRedisClient.get(getBucket(id))
-                .onItem().ifNotNull().transform(Unchecked.function(response -> objectMapper.readValue(response.toString(), domainClass)));
+        return reactiveRedisDataSource.string(domainClass).get(getBucket(id));
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Multi<Optional<C>> get(@SpanAttribute("query.id") final List<String> ids) {
-        return asyncRedisClient.mget(ids.stream().map(this::getBucket).collect(Collectors.toList()))
-                .onItem().transformToMulti(response -> Multi.createFrom().items(
-                        response.getDelegate()
-                                .stream()
-                                .map(res -> {
-                                    try {
-                                        return ObjectUtils.isEmpty(res) ? Optional.empty() : Optional.of(objectMapper.readValue(res.toString(), domainClass));
-                                    } catch (JsonProcessingException e) {
-                                        e.printStackTrace();
-                                        return Optional.empty();
-                                    }
-                                })
-                ));
+        String[] keys = ids.stream().map(this::getBucket).toArray(String[]::new);
+        return reactiveRedisDataSource.string(domainClass).mget(keys)
+                .onItem().transformToMulti(keyValueMap -> Multi.createFrom().emitter(multiEmitter -> {
+                            Arrays.stream(keys).forEach(key -> multiEmitter.emit(keyValueMap.containsKey(key) ? Optional.of(keyValueMap.get(key)) : Optional.empty()));
+                            multiEmitter.complete();
+                        })
+                );
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Uni<List<C>> getList(@SpanAttribute("query.id") String id) {
-        return asyncRedisClient.get(getBucket(id))
-                .onItem().ifNotNull().transform(Unchecked.function(response -> objectMapper.readValue(response.toString(), listType)));
+        return reactiveRedisDataSource.string(String.class).get(getBucket(id))
+                .onItem().ifNotNull().transform(Unchecked.function(a -> objectMapper.readValue(a, listType)));
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Uni<Response> set(final String id, final C t) throws JsonProcessingException {
-        String value = objectMapper.writeValueAsString(t);
-        return asyncRedisClient.set(Arrays.asList(getBucket(id), value));
+        return reactiveRedisDataSource.string(domainClass).set(getBucket(id), t).replaceWith(this::okResponse);
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Uni<Response> set(final String id, final List<C> t) throws JsonProcessingException {
-        String value = objectMapper.writeValueAsString(t);
-        return asyncRedisClient.set(Arrays.asList(getBucket(id), value));
+        return reactiveRedisDataSource.string(String.class).set(getBucket(id), objectMapper.writeValueAsString(t)).replaceWith(this::okResponse);
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Uni<Response> set(final String id, final List<C> t, Long expiryInMilliseconds) throws JsonProcessingException {
-        String value = objectMapper.writeValueAsString(t);
-        return asyncRedisClient.set(Arrays.asList(getBucket(id), value, "PX", expiryInMilliseconds.toString()));
+        SetArgs setArgs = new SetArgs();
+        setArgs.px(expiryInMilliseconds);
+        return reactiveRedisDataSource.string(String.class).set(getBucket(id), objectMapper.writeValueAsString(t), setArgs)
+                .replaceWith(this::okResponse);
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Uni<Response> set(final String id, final C t, Long expiryInMilliseconds) throws JsonProcessingException {
-        String value = objectMapper.writeValueAsString(t);
-        return asyncRedisClient.set(Arrays.asList(getBucket(id), value, "PX", expiryInMilliseconds.toString()));
+        SetArgs setArgs = new SetArgs();
+        setArgs.px(expiryInMilliseconds);
+        return reactiveRedisDataSource.string(domainClass).set(getBucket(id), t, setArgs)
+                .replaceWith(this::okResponse);
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Uni<Void> delete(List<String> ids) {
-        return asyncRedisClient.del(ids.stream().map(this::getBucket).collect(Collectors.toList()))
+        return reactiveRedisDataSource.key(String.class).del(ids.stream().map(this::getBucket).toArray(String[]::new))
                 .replaceWithVoid();
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Uni<Void> mset(final Map<String, C> mp) {
-
-        List<String> keyValue = new ArrayList<>();
-        mp.forEach((k, v) -> {
-            keyValue.add(getBucket(k));
-            try {
-                keyValue.add(objectMapper.writeValueAsString(v));
-            } catch (JsonProcessingException e) {
-                e.printStackTrace();
-                keyValue.add(null);
-            }
-        });
-
-        return asyncRedisClient.mset(keyValue)
-                .replaceWithVoid();
+        return reactiveRedisDataSource.string(domainClass).mset(mp.entrySet().stream().collect(Collectors.toMap(keyValue -> getBucket(keyValue.getKey()), Map.Entry::getValue)));
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Uni<Response> hset(@SpanAttribute("query.hash") final String hash, @SpanAttribute("query.key") String field, final C e) throws JsonProcessingException {
-        return asyncRedisClient.hset(List.of(getBucket(hash), field, objectMapper.writeValueAsString(e)));
+        return reactiveRedisDataSource.hash(domainClass).hset(getBucket(hash), field, e)
+                .map(wasSet -> wasSet ? 1 : 0).map(returnValue -> Response.newInstance(NumberType.create(returnValue)));
     }
 
 
@@ -194,10 +179,8 @@ public class BaseCacheRepositoryImpl<C>
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
+    @Deprecated(since = "3.12.0")
     public Uni<Response> hmset(@SpanAttribute("query.hash") final String hash, final List<String> key, final List<C> values) {
-        List<String> func = new ArrayList<>();
-        func.add(getBucket(hash));
-
         if (key.size() != values.size()) {
             throw new BaseRuntimeException(
                     ErrorLevel.WARNING,
@@ -207,90 +190,50 @@ public class BaseCacheRepositoryImpl<C>
             );
         }
 
-        IntStream.range(0, values.size()).boxed()
-                .forEach(i -> {
-                    func.add(key.get(i));
-                    try {
-                        func.add(objectMapper.writeValueAsString(values.get(i)));
-                    } catch (JsonProcessingException e) {
-                        e.printStackTrace();
-                        throw new BaseRuntimeException(
-                                ErrorLevel.WARNING,
-                                ErrorCode.BAD_REQUEST,
-                                "JsonProcessingError",
-                                e.getMessage()
-                        );
-                    }
-                });
-
-        return asyncRedisClient.hmset(func);
+        // TODO replace with hset?
+        return this.reactiveRedisDataSource.hash(domainClass).hmset(getBucket(hash), IntStream.range(0, key.size()).boxed().collect(Collectors.toMap(key::get, values::get))
+        ).replaceWith(this::okResponse);
     }
 
+    @Deprecated(since = "3.12.0")
     public Uni<Response> hmset(String hash, List<String> key, List<C> values, Long timeInSeconds) {
         return hmset(hash, key, values).call(() -> this.expire(hash, timeInSeconds));
     }
 
+    @Deprecated(since = "3.12.0")
     public Uni<Response> hmset(String hash, List<String> key, List<C> values, Instant instant) {
         return hmset(hash, key, values).call(() -> this.expireat(hash, instant));
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Uni<C> hget(@SpanAttribute("query.hash") final String hash, @SpanAttribute("query.key") final String id) {
-        return asyncRedisClient.hget(getBucket(hash), id)
-                .onItem().ifNotNull().transform(Unchecked.function(response -> objectMapper.readValue(response.toString(), domainClass)));
+        return reactiveRedisDataSource.hash(domainClass).hget(getBucket(hash), id);
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Uni<Map<String, C>> hgetall(@SpanAttribute("query.hash") final String hash) {
-        return asyncRedisClient.hgetall(getBucket(hash))
-                .map(Unchecked.function(response -> {
-                    Map<String, C> mp = new HashMap<>();
-                    for (String key : response.getKeys()) {
-                        mp.put(key,
-                                ObjectUtils.isEmpty(response.get(key)) ?
-                                        null :
-                                        objectMapper.readValue(response.get(key).toString(), domainClass));
-                    }
-                    return mp;
-                }));
+        return reactiveRedisDataSource.hash(domainClass).hgetall(getBucket(hash));
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Uni<Void> hdel(@SpanAttribute("query.hash") final String hash, final List<String> fields) {
-
-        List<String> args = new ArrayList<>();
-        args.add(getBucket(hash));
-        args.addAll(fields);
-
-        return asyncRedisClient
-                .hdel(args)
-                .replaceWithVoid()
-                ;
+        return reactiveRedisDataSource.hash(domainClass).hdel(getBucket(hash), fields.toArray(String[]::new)).replaceWithVoid();
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Multi<String> hkeys(@SpanAttribute("query.hash") final String hash) {
-        return asyncRedisClient.hkeys(getBucket(hash))
-                .onItem().transformToMulti(response -> response.toMulti().map(Response::toString));
+        return reactiveRedisDataSource.hash(domainClass).hkeys(getBucket(hash))
+                .onItem().transformToMulti(keys -> Multi.createFrom().iterable(keys));
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Multi<Optional<C>> hmget(@SpanAttribute("query.hash") final String hash, final List<String> fields) {
-        List<String> fieldList = new ArrayList<>(fields);
-        fieldList.add(0, getBucket(hash));
-        return asyncRedisClient.hmget(fieldList)
-                .onItem().transformToMulti(response -> Multi.createFrom().items(
-                        response.getDelegate()
-                                .stream()
-                                .map(res -> {
-                                    try {
-                                        return ObjectUtils.isEmpty(res) ? Optional.empty() : Optional.of(objectMapper.readValue(res.toString(), domainClass));
-                                    } catch (JsonProcessingException e) {
-                                        e.printStackTrace();
-                                        return Optional.empty();
-                                    }
-                                })
-                ));
+        return reactiveRedisDataSource.hash(domainClass).hmget(getBucket(hash), fields.toArray(String[]::new))
+                .onItem().transformToMulti(keyValueMap -> Multi.createFrom().emitter(multiEmitter -> {
+                            fields.forEach(field -> multiEmitter.emit(keyValueMap.containsKey(field) ? Optional.of(keyValueMap.get(field)) : Optional.empty()));
+                            multiEmitter.complete();
+                        })
+                );
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
@@ -305,24 +248,8 @@ public class BaseCacheRepositoryImpl<C>
             );
         }
 
-        List<String> func = new ArrayList<>();
-        func.add(getBucket(hash));
-        IntStream.range(0, values.size()).boxed()
-                .forEach(i -> {
-                    func.add(scores.get(i).toString());
-                    try {
-                        func.add(objectMapper.writeValueAsString(values.get(i)));
-                    } catch (JsonProcessingException e) {
-                        e.printStackTrace();
-                        throw new BaseRuntimeException(
-                                ErrorLevel.WARNING,
-                                ErrorCode.BAD_REQUEST,
-                                "JsonProcessingError",
-                                "Json could not be processed"
-                        );
-                    }
-                });
-        return asyncRedisClient.zadd(func);
+        return zadd(hash, IntStream.range(0, values.size()).boxed().collect(Collectors.toMap(values::get, scores::get)));
+
     }
 
     public Uni<Response> zadd(String hash, List<C> values, List<Number> scores, Long timeInSeconds) {
@@ -335,14 +262,9 @@ public class BaseCacheRepositoryImpl<C>
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Uni<Response> zadd(@SpanAttribute("query.hash") String hash, Map<C, Number> map) {
-        List<C> values = new ArrayList<>();
-        List<Number> scores = new ArrayList<>();
-
-        map.forEach((k, v) -> {
-            values.add(k);
-            scores.add(v);
-        });
-        return this.zadd(hash, values, scores);
+        return reactiveRedisDataSource.sortedSet(domainClass)
+                .zadd(getBucket(hash), map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().doubleValue())))
+                .map(count -> Response.newInstance(NumberType.create(count)));
     }
 
     public Uni<Response> zadd(String hash, Map<C, Number> map, Long timeInSeconds) {
@@ -355,73 +277,41 @@ public class BaseCacheRepositoryImpl<C>
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Uni<Pair<C, Double>> zpopmin(@SpanAttribute("query.hash") String hash) {
-        return asyncRedisClient.zpopmin(List.of(getBucket(hash)))
-                .map(Unchecked.function(response -> {
-                    if (ObjectUtils.isEmpty(response) || response.getKeys().isEmpty())
-                        return null;
-                    List<Object> responseList = response.getDelegate()
-                            .stream()
-                            .collect(Collectors.toList());
-                    return new Pair<>(
-                            objectMapper.readValue(responseList.get(0).toString(), domainClass),
-                            Double.parseDouble(responseList.get(1).toString()));
-                }));
+        return reactiveRedisDataSource.sortedSet(domainClass).zpopmin(getBucket(hash)).map(pair -> Pair.create(pair.value(), pair.score()));
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Uni<Pair<C, Double>> zpopmax(@SpanAttribute("query.hash") String hash) {
-        return asyncRedisClient.zpopmax(List.of(getBucket(hash)))
-                .map(Unchecked.function(response -> {
-                    if (ObjectUtils.isEmpty(response) || response.getKeys().isEmpty())
-                        return null;
-                    List<Object> responseList = response.getDelegate()
-                            .stream()
-                            .collect(Collectors.toList());
-                    return new Pair<C, Double>(
-                            objectMapper.readValue(responseList.get(0).toString(), domainClass),
-                            Double.parseDouble(responseList.get(1).toString()));
-                }));
+        return reactiveRedisDataSource.sortedSet(domainClass).zpopmax(getBucket(hash)).map(pair -> Pair.create(pair.value(), pair.score()));
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Multi<Optional<C>> zrange(@SpanAttribute("query.hash") String hash, @SpanAttribute("query.start") Integer start, @SpanAttribute("query.end") Integer end) {
-        List<String> func = List.of(getBucket(hash), start.toString(), end.toString());
-        return asyncRedisClient.zrange(func)
-                .onItem().transformToMulti(response -> Multi.createFrom().iterable(response))
-                .map(res -> {
-                    try {
-                        return Optional.of(objectMapper.readValue(res.toString(), domainClass));
-                    } catch (JsonProcessingException e) {
-                        e.printStackTrace();
-                        return Optional.empty();
-                    }
-                });
+        return reactiveRedisDataSource.sortedSet(domainClass).zrange(getBucket(hash), start, end)
+                .onItem().transformToMulti(list -> Multi.createFrom().iterable(list.stream().map(Optional::of).collect(Collectors.toList())));
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Multi<Optional<C>> zrevrange(@SpanAttribute("query.hash") String hash, @SpanAttribute("query.start") Integer start, @SpanAttribute("query.end") Integer end) {
-        List<String> func = List.of(getBucket(hash), start.toString(), end.toString());
-        return asyncRedisClient.zrevrange(func)
-                .onItem().transformToMulti(response -> Multi.createFrom().iterable(response))
-                .map(res -> {
-                    try {
-                        return Optional.of(objectMapper.readValue(res.toString(), domainClass));
-                    } catch (JsonProcessingException e) {
-                        e.printStackTrace();
-                        return Optional.empty();
-                    }
-                });
+        ZRangeArgs zRangeArgs = new ZRangeArgs();
+        zRangeArgs.rev();
+        return reactiveRedisDataSource.sortedSet(domainClass).zrange(getBucket(hash), start, end, zRangeArgs)
+                .onItem().transformToMulti(list -> Multi.createFrom().iterable(list.stream().map(Optional::of).collect(Collectors.toList())));
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Uni<Response> expire(@SpanAttribute("query.hash") String key, Long timeInSeconds) {
-        return asyncRedisClient.expire(getBucket(key), timeInSeconds.toString());
+        return reactiveRedisDataSource.key().expire(getBucket(key), timeInSeconds)
+                // Same as redis
+                .map(wasSet -> wasSet ? Response.newInstance(NumberType.create(1)) : Response.newInstance(NumberType.create(0)));
     }
 
     @WithSpan(kind = SpanKind.CLIENT)
     public Uni<Response> expireat(@SpanAttribute("query.hash") String key, Instant instant) {
-        return asyncRedisClient.expireat(getBucket(key), String.valueOf(instant.toEpochMilli() / 1000));
+        return reactiveRedisDataSource.key().expireat(getBucket(key), instant)
+                // Same as redis
+                .map(wasSet -> wasSet ? Response.newInstance(NumberType.create(1)) : Response.newInstance(NumberType.create(0)));
     }
-
 }
+
 
